@@ -19,6 +19,8 @@ A feature issue records outcome, acceptance criteria, constraints, related work 
 
 GitHub CI runs Python tests and macOS simulator tests on PRs and main pushes. Upstream watch runs Mondays at 03:17 UTC (08:47 IST) after the workflow reaches the default branch, and can run manually. It compares SDK/tool release metadata and visible documentation text, reports changes in one tracking issue and fails visibly on source-fetch errors. This is a change detector, not a semantic assessment or self-repair agent. Upstream content is never executed or passed as instructions.
 
+The manual `iOS TestFlight` GitHub Actions workflow runs only on `main`. It first runs Python and simulator tests without release credentials. A separate job uses the protected `testflight` environment to import a temporary signing identity, archive and export with `xcodebuild`, and optionally upload using `xcrun altool`. Upload defaults to off. It never submits a production release or assigns testers automatically. The owner must configure required environment reviewers and restrict deployment branches to `main` before adding credentials. Pull-request and coding jobs must not receive those credentials. This replaces the earlier Codemagic configuration; it does not configure Xcode Cloud.
+
 Dependabot checks GitHub Actions weekly. The monitor tracks Firebase releases separately because the app dependency is in XcodeGen YAML.
 
 ## Required service setup

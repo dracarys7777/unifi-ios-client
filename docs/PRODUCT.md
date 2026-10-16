@@ -25,7 +25,7 @@ Operate a native Google Cloud Gemini workspace from iPhone and develop it throug
 
 ## Architecture decisions
 
-SwiftUI, iOS 17 minimum; Firebase AI Logic using the Vertex backend; FirebaseAuth email/password as bootstrap access; Firebase App Check; Codable local history; XcodeGen; GitHub Actions for checks and scheduled upstream watch; Codemagic for signing/distribution.
+SwiftUI, iOS 17 minimum; Firebase AI Logic using the Vertex backend; FirebaseAuth email/password as bootstrap access; Firebase App Check; Codable local history; XcodeGen; GitHub Actions for checks, scheduled upstream watch, and manually dispatched TestFlight builds using Apple's command-line tools.
 
 This is a personal beta foundation. Public distribution requires an account-management/access-control design (including limiting access to paid APIs), deletion flows, privacy disclosures, live backend validation and release review. A sign-in screen alone is not a project-owner allowlist.
 
