@@ -1,12 +1,24 @@
 # Build and install using only an iPhone
 
-Use Safari for GitHub, Apple Developer, App Store Connect, and Firebase. GitHub Actions supplies the Mac and runs Apple's `xcodebuild`; Codemagic and Xcode Cloud are not used. A paid Apple Developer membership is required for TestFlight. You do not need your own Mac, but you must supply a distribution certificate with its private key and an App Store provisioning profile.
+Use Safari for GitHub, Apple Developer, App Store Connect, and Firebase. GitHub Actions supplies the Mac and runs Apple's `xcodebuild`; Codemagic and Xcode Cloud are not used. The migration is already merged into `main`. You do not need to upload the ZIP, set up Codemagic, or merge the migration again.
 
-## 1. Merge and check the source
+A paid Apple Developer membership is required for TestFlight. You do not need your own Mac, but you must supply a distribution certificate with its private key and an App Store provisioning profile. The first export-only run still creates a **signed** build: it requires those signing files and Firebase configuration. Only the App Store Connect upload key can wait until later.
 
-The foundation files are already on `main`. Review and merge the migration PR containing `.github/workflows/testflight.yml` before using the new release workflow. In GitHub Actions, confirm both `validate` and `ios` pass for the reviewed revision. Neither job requires Firebase or signing credentials.
+The path to installation is:
 
-The open earlier PR adding `docs/SETUP.md` proposes Xcode Cloud; that proposal is superseded by this GitHub Actions workflow. Review that PR separately rather than merging conflicting build instructions.
+1. Prepare Apple signing files and Firebase configuration.
+2. Create the protected GitHub environment named `testflight`.
+3. Add `APPLE_TEAM_ID` as an **environment variable**, and signing values as **environment secrets**.
+4. Run **iOS TestFlight** on `main` with upload unchecked and confirm IPA export succeeds.
+5. Add the upload key, run again with upload checked, then install through TestFlight.
+
+On iPhone, use Safari's **Request Desktop Website** if GitHub or Apple settings are hidden. You need repository administrator access for environment settings and appropriate Apple account access for certificates, API keys, and the app record.
+
+## 1. Check the source
+
+Open [GitHub Actions](https://github.com/dracarys7777/unifi-ios-client/actions) and confirm the `validate` and `ios` checks pass for the reviewed `main` revision. Neither check needs Firebase or signing credentials. Successful simulator checks do not establish that signing, upload, or live Firebase access works.
+
+The current release workflow is [`.github/workflows/testflight.yml`](../.github/workflows/testflight.yml). Older proposals describing Xcode Cloud are not the setup used by this guide.
 
 If editing from an iPhone, use a private GitHub Codespace or GitHub's web editor, a scoped branch, and a PR. Do not upload the source ZIP again. Signing credentials belong in the protected release environment, never in the repository or coding-agent environment.
 
@@ -45,15 +57,22 @@ Choose a supported model ID and region from your project's model access screen. 
 
 ## 4. Configure protected GitHub release settings
 
-In the repository's **Settings → Environments**, create **`testflight`**. Before adding credentials, configure required owner review and deployment branches restricted to `main`. Keep repository Actions permissions at read-only; this workflow needs no write permission. If your plan or role cannot enforce these protections, resolve that before adding release credentials.
+Open [Settings → Environments](https://github.com/dracarys7777/unifi-ios-client/settings/environments) in Safari:
 
-Add this environment variable:
+1. Tap **New environment**, enter exactly **`testflight`**, then configure the environment. If it already exists, open it instead.
+2. Under **Required reviewers**, add yourself or another trusted reviewer and save. If you are the only reviewer and will start the run yourself, leave **Prevent self-review** unchecked; otherwise you cannot approve that run. If your policy requires independent approval, add another eligible reviewer instead.
+3. Under **Deployment branches and tags**, choose **Selected branches and tags**, add a branch rule for **`main`**, and save. The workflow also rejects dispatches on other branches.
+4. Keep repository Actions permissions at read-only; this workflow needs no write permission. If your plan or role cannot enforce the required protections, resolve that before adding release credentials.
+
+On this same `testflight` page, find **Environment variables → Add variable**:
 
 | Variable | Value |
 | --- | --- |
 | `APPLE_TEAM_ID` | Your 10-character Apple team identifier |
 
-Add these **environment secrets**, not repository-wide secrets:
+`APPLE_TEAM_ID` is a **variable, not a secret**. The workflow reads `${{ vars.APPLE_TEAM_ID }}`. Find your Team ID in your Apple Developer membership details; it is not your Apple ID email, app bundle ID, API key ID, or App Store Connect issuer ID.
+
+Next, use **Environment secrets → Add secret** on that same page. Add these four secrets for the first export-only build:
 
 | Secret | Value |
 | --- | --- |
@@ -61,6 +80,11 @@ Add these **environment secrets**, not repository-wide secrets:
 | `P12_PASSWORD` | The `.p12` export password |
 | `BUILD_PROVISION_PROFILE_BASE64` | Single-line base64 of the App Store distribution `.mobileprovision` |
 | `FIREBASE_PLIST_BASE64` | Single-line base64 of `GoogleService-Info.plist` |
+
+Add these three more **environment secrets** before enabling upload:
+
+| Secret | Value |
+| --- | --- |
 | `ASC_KEY_ID` | App Store Connect team API key ID; required only for upload |
 | `ASC_ISSUER_ID` | App Store Connect issuer UUID; required only for upload |
 | `ASC_PRIVATE_KEY_BASE64` | Single-line base64 of the `.p8`; required only for upload |
@@ -71,28 +95,59 @@ To encode a file in a private terminal, write the output to a private file inste
 python3 -c 'import base64, pathlib, sys; pathlib.Path(sys.argv[2]).write_bytes(base64.b64encode(pathlib.Path(sys.argv[1]).read_bytes()))' input-file output.base64
 ```
 
-Transfer the encoded value only through GitHub's secret-entry UI. Base64 is not encryption. Remove temporary copies after saving and backing up the originals securely. Do not put these files into a coding-agent task or this public repository. No signing or Firebase values have been supplied by this migration.
+For example, replace `input-file` with your `.p12`, `.mobileprovision`, Firebase plist, or `.p8` filename. Open the resulting `output.base64` privately and copy its contents into the matching GitHub secret. `P12_PASSWORD`, `ASC_KEY_ID`, and `ASC_ISSUER_ID` are entered directly, without base64 encoding.
 
-## 5. Run the build from Safari
+Store all these entries under **the `testflight` environment**, not repository-wide Actions secrets or Codex environment settings. Base64 is not encryption. Remove temporary copies after saving and backing up the originals securely. Do not put signing files or values into a coding-agent task, chat, or this public repository. This guide does not verify whether your settings have been entered.
 
-1. Open **Actions → iOS TestFlight → Run workflow**. Choose `main`.
-2. Leave **Upload the signed build to App Store Connect for TestFlight** off for the first export check.
-3. The workflow runs the Python and simulator tests first, without release credentials. Approve the separate release job only after reviewing the revision.
-4. The release job uses a temporary keychain, validates the profile and Firebase plist, runs `xcodebuild archive` and `xcodebuild -exportArchive`, and cleans up its credentials on success or failure. Build numbers use `run number.run attempt`, so retries get a new build number. If this marketing version already has higher build numbers from another system, adjust the numbering in a reviewed change before upload.
-5. On success, the **Unifi-…** artifact contains the signed IPA and is retained for seven days. A downloaded App Store IPA cannot be installed directly from Files or Safari.
-6. To send it to Apple, run the workflow again with upload enabled. It creates a new build and uses `xcrun altool` to upload. Upload success does not mean Apple processing or installation has finished.
+## 5. Run the first build with upload disabled
+
+1. Open [Actions → iOS TestFlight](https://github.com/dracarys7777/unifi-ios-client/actions/workflows/testflight.yml) and tap **Run workflow**.
+2. Select the branch **`main`**.
+3. Leave **Upload the signed build to App Store Connect for TestFlight** **unchecked**, then tap **Run workflow** to start.
+4. Open the new run. The `checks` job runs Python and simulator tests without release credentials.
+5. When the `release` job is waiting, tap **Review deployments**, select **`testflight`**, review the commit, and approve it. Only configured reviewers can approve; if self-review prevention is enabled, someone other than the person who started the run must approve.
+6. Wait for the `release` job to turn green. It uses a temporary keychain, validates the profile and Firebase plist, runs `xcodebuild archive` and `xcodebuild -exportArchive`, and cleans up credentials on normal completion or failure.
+7. Open the run's **Artifacts** section. The **Unifi-…** artifact contains the signed IPA and is retained for seven days. A downloaded App Store IPA cannot be installed directly from Files or Safari; use the next steps to reach TestFlight.
+
+Build numbers use `run number.run attempt`, so retries get a new build number. If this marketing version already has higher build numbers from another system, adjust the numbering in a reviewed change before upload.
+
+## 6. Enable TestFlight upload
+
+After export succeeds:
+
+1. Confirm the matching app record exists in App Store Connect and the three `ASC_*` environment secrets from section 4 are set.
+2. Open **Actions → iOS TestFlight → Run workflow**, choose **`main`**, and **check** the upload option.
+3. Start the run, wait for `checks`, and approve the `testflight` deployment as before.
+4. Wait for the archive/export/upload step to succeed. This run creates a new signed build and uses Apple's `xcrun altool` to upload it. Upload success does not mean Apple processing or installation has finished.
 
 These builds are marked for **internal TestFlight testing only**. This workflow does not submit to App Review, publish to the App Store, or automatically add a build to a tester group. No Codemagic integration or environment group is needed.
 
-For a trusted separate Mac, the same script can be used after resolving packages with `xcodegen generate` and `xcodebuild -resolvePackageDependencies -project Unifi.xcodeproj -scheme Unifi`, setting the documented release inputs and a unique `BUILD_NUMBER` such as `12.1`. Use Xcode 16 or newer and a fresh checkout; `bash scripts/release-ios.sh` refuses to overwrite an existing Firebase plist, installed matching profile, or release outputs.
+## 7. Install through TestFlight
 
-## 6. Install through TestFlight
-
-In App Store Connect, wait for processing, complete any required export-compliance information, create an internal testing group, and add the processed build and your eligible App Store Connect user. Install [TestFlight](https://apps.apple.com/app/testflight/id899247664) from the App Store and accept the invitation.
+1. In Safari, open **App Store Connect → My Apps → your app → TestFlight**.
+2. Wait for the uploaded build to finish processing and complete any requested export-compliance information.
+3. Create an **internal testing** group, add the processed build, and add your eligible App Store Connect user as a tester.
+4. Install [TestFlight](https://apps.apple.com/app/testflight/id899247664) from the App Store on your iPhone.
+5. Accept the tester invitation, open the app in TestFlight, and tap **Install**.
 
 On the iPhone, verify sign-in; a live reply; a second message using history; stop followed immediately by another message; airplane mode; relaunch persistence; account separation; confirmed deletion; Dynamic Type and VoiceOver; App Check and quota failures. A successful archive or simulator run does not establish these behaviors.
 
-## 7. Maintenance and recovery
+## 8. Troubleshooting
+
+| What you see | What to check |
+| --- | --- |
+| No **Run workflow** button | Sign in with repository write access, open the `iOS TestFlight` workflow rather than `iOS checks`, and try Safari's desktop website view. |
+| Both jobs skipped | Run the workflow on `main`; other branches are intentionally excluded. |
+| **Waiting for review** | Use **Review deployments** with a configured reviewer. Check the self-review setting if you started the run. |
+| Missing `APPLE_TEAM_ID` | Add it under **testflight → Environment variables**, not secrets. |
+| Missing signing/Firebase setting | Add the exact name from the first secrets table under **testflight → Environment secrets**, even for export-only runs. |
+| Base64 validation fails | Encode the complete original file as one line, without spaces or line breaks. Do not base64-encode passwords or API key IDs. |
+| Provisioning profile rejected | Use an unexpired iOS App Store distribution profile for the same team, bundle ID, and distribution certificate. |
+| Certificate import or signing fails | Confirm the `.p12` contains the private key, its password is correct, and its certificate matches the profile. Share error text only, without credentials. |
+| Export succeeds but there is no TestFlight build | Export-only does not upload. Set the three upload secrets, run again with upload checked, then check Apple processing status. |
+| Upload fails after export | Inspect the failed step's error. If the IPA was exported, the workflow can still retain it as an artifact; an artifact alone does not confirm upload. |
+
+## 9. Maintenance and recovery
 
 After CI has run, require the `validate` and `ios` checks and owner review for workflow/signing changes. Scheduled upstream-watch configuration is independent of the release workflow; verify its operation separately. Coding/review agents and production telemetry require separate setup.
 
