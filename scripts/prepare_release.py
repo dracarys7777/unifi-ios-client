@@ -9,7 +9,7 @@ import plistlib
 import re
 import uuid
 
-BUNDLE_ID = "com.suhasmallya.unifi"
+BUNDLE_ID = "com.suhasmallya7.unifi"
 
 
 def required(environment, name):
