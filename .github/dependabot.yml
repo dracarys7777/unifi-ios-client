@@ -1,0 +1,9 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+# Firebase is declared in XcodeGen YAML; the upstream monitor covers SDK releases.
+# Do not claim Dependabot updates project.yml or validates model compatibility.

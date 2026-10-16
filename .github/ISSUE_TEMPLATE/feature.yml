@@ -1,0 +1,21 @@
+name: Feature request
+description: Turn a prompt into a testable product change
+title: "[feature] "
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What should unifi do?
+      description: Describe the user outcome and an example.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How will we know it works?
+      description: Observable behavior, edge cases, and what is out of scope.
+  - type: textarea
+    id: conflicts
+    attributes:
+      label: Related requests or constraints
+      description: Privacy, cost, offline behavior, existing features, or dependencies.

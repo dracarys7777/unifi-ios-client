@@ -1,0 +1,13 @@
+.DS_Store
+.build/
+build/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+GoogleService-Info.plist
+*.p8
+*.p12
+*.mobileprovision
+.env*
+__pycache__/
+App/Assets.xcassets/
