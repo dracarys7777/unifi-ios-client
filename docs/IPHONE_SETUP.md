@@ -14,7 +14,7 @@ If editing from an iPhone, use a private GitHub Codespace or GitHub's web editor
 
 In Safari, sign in to [Apple Developer](https://developer.apple.com/account/) and [App Store Connect](https://appstoreconnect.apple.com/).
 
-1. Register an explicit App ID for `com.suhasmallya.unifi` and create the matching App Store Connect app record. If this identifier is unavailable, change it consistently in `project.yml`, `scripts/prepare_firebase.py`, and `scripts/prepare_release.py` through a separate reviewed change, and use matching Firebase and Apple registrations.
+1. Register an explicit App ID for `com.suhasmallya7.unifi` and create the matching App Store Connect app record. If this identifier is unavailable, change it consistently in `project.yml`, `scripts/prepare_firebase.py`, and `scripts/prepare_release.py` through a separate reviewed change, and use matching Firebase and Apple registrations.
 2. Create an **Apple Distribution** certificate and export it with its private key as a password-protected `.p12`. A downloaded `.cer` alone is insufficient. If you already have a signing identity, reuse it; do not revoke existing certificates to make this workflow work.
 3. Create an **App Store Connect distribution** provisioning profile for this App ID and certificate. Development, ad hoc, and enterprise profiles are rejected. Complete the App Attest capability setup required by Firebase App Check.
 4. Record your 10-character Apple Team ID.
