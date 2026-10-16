@@ -1,0 +1,70 @@
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_to_testflight:
+        description: Upload the signed build to App Store Connect for TestFlight
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Python regression tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Simulator tests without release credentials
+        run: bash scripts/check-ios.sh
+
+  release:
+    needs: checks
+    runs-on: macos-15
+    timeout-minutes: 45
+    environment: testflight
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Prepare build tools and resolve packages without release credentials
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          python3 scripts/make_icon.py
+          xcodegen generate
+          xcodebuild -version
+          xcodegen --version
+          xcodebuild -resolvePackageDependencies -project Unifi.xcodeproj -scheme Unifi
+      - name: Archive, export, and optionally upload with Apple tools
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          FIREBASE_PLIST_BASE64: ${{ secrets.FIREBASE_PLIST_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
+          UPLOAD_TO_TESTFLIGHT: ${{ inputs.upload_to_testflight }}
+          BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+        run: bash scripts/release-ios.sh
+      - name: Save the signed IPA
+        if: ${{ !cancelled() && hashFiles('build/ios/ipa/*.ipa') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Unifi-${{ github.run_number }}-${{ github.run_attempt }}
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: error
+          retention-days: 7
