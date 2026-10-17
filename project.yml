@@ -1,4 +1,5 @@
-name: unifi chat
+# Build scripts expect Unifi.xcodeproj; the app label is configured below.
+name: Unifi
 options:
   bundleIdPrefix: com.suhasmallya7
   deploymentTarget:
@@ -22,7 +23,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         PRODUCT_BUNDLE_IDENTIFIER: com.suhasmallya7.unifi
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: unifi
+        INFOPLIST_KEY_CFBundleDisplayName: unifi chat
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         TARGETED_DEVICE_FAMILY: "1"
