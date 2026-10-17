@@ -10,6 +10,7 @@ import re
 import uuid
 
 BUNDLE_ID = "com.suhasmallya7.unifi"
+APP_ATTEST_ENTITLEMENT = "com.apple.developer.devicecheck.appattest-environment"
 
 
 def required(environment, name):
@@ -75,6 +76,16 @@ def export_options(profile, team_id, now=None):
     if (entitlements.get("get-task-allow") or "ProvisionedDevices" in profile
             or profile.get("ProvisionsAllDevices") or "iOS" not in profile.get("Platform", [])):
         raise ValueError("An iOS App Store distribution provisioning profile is required")
+    allowed_attest_environments = entitlements.get(APP_ATTEST_ENTITLEMENT, [])
+    if isinstance(allowed_attest_environments, str):
+        allowed_attest_environments = [allowed_attest_environments]
+    if not isinstance(allowed_attest_environments, list) or "production" not in allowed_attest_environments:
+        raise ValueError(
+            "Provisioning profile does not allow production App Attest. "
+            "Enable App Attest for the app's Apple identifier, regenerate the "
+            "App Store distribution profile, and update BUILD_PROVISION_PROFILE_BASE64 "
+            "in the testflight environment."
+        )
     try:
         profile_id = str(uuid.UUID(profile.get("UUID", ""))).upper()
     except (ValueError, AttributeError):

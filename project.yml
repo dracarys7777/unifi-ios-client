@@ -22,6 +22,7 @@ targets:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         PRODUCT_BUNDLE_IDENTIFIER: com.suhasmallya7.unifi
+        CODE_SIGN_ENTITLEMENTS: App/Unifi.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: unifi chat
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
