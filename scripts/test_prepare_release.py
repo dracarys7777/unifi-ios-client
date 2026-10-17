@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from prepare_release import BUNDLE_ID, export_options, stage_credentials
+from prepare_release import APP_ATTEST_ENTITLEMENT, BUNDLE_ID, export_options, stage_credentials
 
 
 class ReleaseTests(unittest.TestCase):
@@ -22,6 +22,7 @@ class ReleaseTests(unittest.TestCase):
                 "application-identifier": f"{self.team}.{BUNDLE_ID}",
                 "com.apple.developer.team-identifier": self.team,
                 "get-task-allow": False,
+                APP_ATTEST_ENTITLEMENT: "production",
             },
         }
         # Deliberately fake bytes; no Apple or Firebase credentials are used.
@@ -79,6 +80,22 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual((directory / "certificate.p12").read_bytes(), b"fake certificate")
             self.assertEqual((directory / "certificate.p12").stat().st_mode & 0o777, 0o600)
             self.assertFalse((directory / "private_keys").exists())
+
+    def test_rejects_profile_without_production_app_attest(self):
+        for allowed in (None, "development", ["development"], False):
+            with self.subTest(allowed=allowed):
+                profile = deepcopy(self.profile)
+                if allowed is None:
+                    del profile["Entitlements"][APP_ATTEST_ENTITLEMENT]
+                else:
+                    profile["Entitlements"][APP_ATTEST_ENTITLEMENT] = allowed
+                with self.assertRaisesRegex(ValueError, "production App Attest"):
+                    export_options(profile, self.team, self.now)
+
+    def test_accepts_profile_allowing_production_in_environment_list(self):
+        profile = deepcopy(self.profile)
+        profile["Entitlements"][APP_ATTEST_ENTITLEMENT] = ["development", "production"]
+        self.assertEqual(export_options(profile, self.team, self.now)["teamID"], self.team)
 
     def test_upload_requires_key_before_writing_any_credentials(self):
         environment = {**self.environment, "UPLOAD_TO_TESTFLIGHT": "true"}
