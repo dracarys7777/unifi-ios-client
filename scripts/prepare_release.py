@@ -86,10 +86,10 @@ def export_options(profile, team_id, now=None):
             "App Store distribution profile, and update BUILD_PROVISION_PROFILE_BASE64 "
             "in the testflight environment."
         )
-    try:
-        profile_id = str(uuid.UUID(profile.get("UUID", ""))).upper()
-    except (ValueError, AttributeError):
-        raise ValueError("Provisioning profile UUID is invalid") from None
+    profile_id = profile.get("UUID", "")
+    if not isinstance(profile_id, str) or not re.fullmatch(
+            r"[A-Fa-f0-9]{8}(?:-[A-Fa-f0-9]{4}){3}-[A-Fa-f0-9]{12}", profile_id):
+        raise ValueError("Provisioning profile UUID is invalid")
     return {
         "method": "app-store-connect",
         "destination": "export",
@@ -115,8 +115,12 @@ def main():
             with (args.directory / "profile.plist").open("rb") as stream:
                 profile = plistlib.load(stream)
             options = export_options(profile, required(os.environ, "APPLE_TEAM_ID"))
+            name = profile.get("Name")
+            if not isinstance(name, str) or not name.strip() or any(c in name for c in "\r\n\x00"):
+                raise ValueError("Provisioning profile name is missing or invalid")
             (args.directory / "ExportOptions.plist").write_bytes(plistlib.dumps(options))
             (args.directory / "profile-uuid").write_text(options["provisioningProfiles"][BUNDLE_ID])
+            (args.directory / "profile-name").write_text(name)
     except (ValueError, OSError, plistlib.InvalidFileException) as error:
         raise SystemExit(str(error)) from None
 
