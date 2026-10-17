@@ -94,6 +94,12 @@ On the iPhone, verify sign-in; a live reply; a second message using history; sto
 
 ## 7. Maintenance and recovery
 
+Release signing troubleshooting:
+
+- If Xcode says a Firebase or GoogleUtilities target **does not support provisioning profiles**, the app's profile has been applied to a dependency. Use the app-scoped Release settings in `project.yml` and `scripts/archive-ios.sh`; do not add global `PROVISIONING_PROFILE_SPECIFIER`, `CODE_SIGN_STYLE`, or `CODE_SIGN_IDENTITY` arguments to the archive command. This is a build-script problem, not a reason to recreate your certificate.
+- If Xcode says **No profile for team ... matching ... found**, verify the release setup installed the decoded profile. The script installs it in both `~/Library/MobileDevice/Provisioning Profiles` and `~/Library/Developer/Xcode/UserData/Provisioning Profiles`, selects its declared name for the app archive, and uses its UUID for export. It removes only its own copies during cleanup. The profile must still match the team, bundle ID, certificate, and production App Attest capability.
+- A successful simulator run does not validate signed archives. After merging a signing fix, start a new `iOS TestFlight` run on `main` with upload disabled before attempting upload.
+
 After CI has run, require the `validate` and `ios` checks and owner review for workflow/signing changes. Scheduled upstream-watch configuration is independent of the release workflow; verify its operation separately. Coding/review agents and production telemetry require separate setup.
 
 If a beta is faulty, stop new release dispatches, expire the affected TestFlight build if appropriate, and prepare a reviewed correction. Source rollback does not replace an already installed app. Existing Codemagic account connections are external settings: this change removes the repository configuration but does not disconnect your account, delete its secrets, or cancel its jobs. Disable any old Codemagic triggers before the first GitHub release.

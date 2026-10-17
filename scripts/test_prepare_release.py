@@ -2,7 +2,10 @@ import base64
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import plistlib
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -14,6 +17,7 @@ class ReleaseTests(unittest.TestCase):
         self.team = "TESTTEAM01"
         self.now = datetime(2026, 1, 1, tzinfo=timezone.utc)
         self.profile = {
+            "Name": "Unifi Test Distribution",
             "UUID": "11111111-2222-3333-4444-555555555555",
             "ExpirationDate": self.now + timedelta(days=30),
             "TeamIdentifier": [self.team],
@@ -61,6 +65,28 @@ class ReleaseTests(unittest.TestCase):
         profile["Entitlements"]["application-identifier"] = self.team + ".other.app"
         with self.assertRaisesRegex(ValueError, "bundle ID"):
             export_options(profile, self.team, self.now)
+
+    def test_profile_uuid_case_is_preserved(self):
+        profile = deepcopy(self.profile)
+        profile["UUID"] = "abcdefab-1234-5678-90ab-abcdef123456"
+        options = export_options(profile, self.team, self.now)
+        self.assertEqual(options["provisioningProfiles"][BUNDLE_ID], profile["UUID"])
+
+    def test_profile_command_emits_name_for_archive_and_uuid_for_export(self):
+        profile = deepcopy(self.profile)
+        profile["ExpirationDate"] = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30)
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            (directory / "profile.plist").write_bytes(plistlib.dumps(profile))
+            result = subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("prepare_release.py")), "profile", temp],
+                env={**os.environ, "APPLE_TEAM_ID": self.team}, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((directory / "profile-name").read_text(), profile["Name"])
+            self.assertEqual((directory / "profile-uuid").read_text(), profile["UUID"])
+            options = plistlib.loads((directory / "ExportOptions.plist").read_bytes())
+            self.assertEqual(options["provisioningProfiles"][BUNDLE_ID], profile["UUID"])
 
     def test_rejects_development_adhoc_enterprise_and_non_ios_profiles(self):
         for kind in ("development", "adhoc", "enterprise", "macOS"):

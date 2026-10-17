@@ -28,6 +28,14 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         TARGETED_DEVICE_FAMILY: "1"
+      configs:
+        Release:
+          # Only the app consumes these inputs. Command-line CODE_SIGN_* and
+          # PROVISIONING_PROFILE_* overrides also affect Swift package bundles.
+          DEVELOPMENT_TEAM: $(UNIFI_SIGNING_TEAM)
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: $(UNIFI_SIGNING_PROFILE)
     dependencies:
       - package: Firebase
         product: FirebaseAI

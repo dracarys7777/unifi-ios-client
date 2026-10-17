@@ -34,6 +34,7 @@ KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
 KEYCHAIN_CHANGED=false
 FIREBASE_CREATED=false
 PROFILE_INSTALLED=false
+PROFILE_PATHS=()
 ORIGINAL_KEYCHAINS=()
 while IFS= read -r keychain; do
   if [[ -n "$keychain" ]]; then ORIGINAL_KEYCHAINS+=("$keychain"); fi
@@ -47,7 +48,7 @@ cleanup() {
     security list-keychains -d user -s "${ORIGINAL_KEYCHAINS[@]}"
   fi
   security delete-keychain "$KEYCHAIN_PATH" >/dev/null 2>&1
-  if [[ "$PROFILE_INSTALLED" == true ]]; then rm -f "$PROFILE_PATH"; fi
+  if [[ "$PROFILE_INSTALLED" == true ]]; then rm -f "${PROFILE_PATHS[@]}"; fi
   if [[ "$FIREBASE_CREATED" == true ]]; then rm -f "$REPO_ROOT/App/GoogleService-Info.plist"; fi
   rm -rf "$SIGNING_DIR"
   exit "$result"
@@ -62,16 +63,26 @@ python3 scripts/prepare_firebase.py
 security cms -D -i "$SIGNING_DIR/profile.mobileprovision" > "$SIGNING_DIR/profile.plist"
 python3 scripts/prepare_release.py profile "$SIGNING_DIR"
 PROFILE_UUID=$(cat "$SIGNING_DIR/profile-uuid")
-# Xcode 16 and later store profiles here.
-PROFILE_DIRECTORY="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
-PROFILE_PATH="$PROFILE_DIRECTORY/$PROFILE_UUID.mobileprovision"
-if [[ -e "$PROFILE_PATH" ]]; then
-  echo 'Refusing to replace an existing provisioning profile; use a fresh runner.' >&2
-  exit 1
-fi
-mkdir -p "$PROFILE_DIRECTORY"
-cp "$SIGNING_DIR/profile.mobileprovision" "$PROFILE_PATH"
-PROFILE_INSTALLED=true
+PROFILE_NAME=$(cat "$SIGNING_DIR/profile-name")
+# Xcode releases use both locations. Install the identical profile in each;
+# preserve existing files and track only our own copies for cleanup.
+PROFILE_DIRECTORIES=(
+  "$HOME/Library/MobileDevice/Provisioning Profiles"
+  "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+)
+for profile_directory in "${PROFILE_DIRECTORIES[@]}"; do
+  if [[ -e "$profile_directory/$PROFILE_UUID.mobileprovision" ]]; then
+    echo 'Refusing to replace an existing provisioning profile; use a fresh runner.' >&2
+    exit 1
+  fi
+done
+for profile_directory in "${PROFILE_DIRECTORIES[@]}"; do
+  mkdir -p "$profile_directory"
+  profile_path="$profile_directory/$PROFILE_UUID.mobileprovision"
+  cp "$SIGNING_DIR/profile.mobileprovision" "$profile_path"
+  PROFILE_PATHS+=("$profile_path")
+  PROFILE_INSTALLED=true
+done
 
 security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
@@ -83,12 +94,7 @@ security list-keychains -d user -s "$KEYCHAIN_PATH" "${ORIGINAL_KEYCHAINS[@]}"
 
 python3 scripts/make_icon.py
 xcodegen generate
-xcodebuild archive -project Unifi.xcodeproj -scheme Unifi -configuration Release \
-  -destination 'generic/platform=iOS' -archivePath build/Unifi.xcarchive \
-  -derivedDataPath build/ReleaseDerivedData \
-  DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY='Apple Distribution' PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
-  CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+PROFILE_NAME="$PROFILE_NAME" bash scripts/archive-ios.sh
 xcodebuild -exportArchive -archivePath build/Unifi.xcarchive \
   -exportPath build/ios/ipa -exportOptionsPlist "$SIGNING_DIR/ExportOptions.plist"
 
