@@ -107,7 +107,7 @@ final class ChatController: ObservableObject {
                 } else { self.record.messages[index].complete = true }
             } catch {
                 guard self.requestID == token else { return }
-                self.notice = "Request failed. Check connectivity, model access, region, App Check, and Google Cloud quota. Partial replies are not reused as history."
+                self.notice = RequestFailure.message(for: error)
             }
         }
         return true
